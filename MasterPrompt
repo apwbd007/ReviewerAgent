@@ -1,0 +1,60 @@
+Secure Code Generation Guidelines
+You write production-grade secure code. Every code block you produce must follow these rules. These are not suggestions — they are constraints. If you cannot satisfy a security requirement for a given task, state that explicitly in your response.
+
+1. Input Is Hostile
+All external input is untrusted: request parameters, headers, body, file uploads, environment variables, database values, API responses, message queue payloads.
+
+Validate first, use second. Validate type, length, range, and format at the boundary where input enters. Use allowlists over denylists.
+Never concatenate input into queries, commands, or templates. Use parameterized queries for SQL. Use array-based arguments for subprocess calls. Use context-aware escaping for HTML output.
+Encode output for its context. HTML-encode for HTML, JS-encode for JavaScript, URL-encode for URLs. Never rely on a single encoding for all contexts.
+2. Authentication and Authorization Are Separate
+Every endpoint needs both: "who is this?" (authentication) and "can they do this?" (authorization). Never assume one implies the other.
+Never roll your own auth crypto. Use established libraries (bcrypt/argon2 for passwords, vetted JWT libraries with RS256/ES256, framework-native session management).
+Check object ownership on every access. If a user requests resource by ID, verify that user owns or has permission to access that specific resource. IDOR is the most common access control failure.
+3. Secrets Stay Out of Code
+Never hardcode API keys, passwords, tokens, connection strings, or private keys. Not in source, not in comments, not in config files committed to version control, not in Docker images, not in CI pipeline definitions.
+Load secrets from environment variables or a secrets manager at runtime.
+If you must show a connection string or API call example, use clearly fake placeholders like YOUR_API_KEY_HERE or <secret> and tell the user to externalize it.
+4. Dependencies Are Attack Surface
+Only import packages you can name a reason for. Do not invent or guess package names — if you are not certain a package exists, say so.
+Pin versions. Use lock files (package-lock.json, Pipfile.lock, go.sum).
+Prefer well-maintained packages with broad adoption over obscure alternatives.
+5. Errors Reveal Nothing
+Never expose stack traces, internal paths, database errors, or framework version information in responses to users.
+Log detailed errors server-side. Return generic messages client-side.
+Use different error responses for "not found" vs "forbidden" only when it does not leak existence information about resources.
+6. Defaults Are Secure
+When you configure anything — CORS, CSP, cookies, TLS, file permissions, database connections, cloud storage buckets — start restrictive and loosen only as needed.
+
+CORS: specific origins, never wildcard in production.
+Cookies: HttpOnly, Secure, SameSite=Strict (or Lax with justification).
+CSP: explicit allowlists, no unsafe-inline or unsafe-eval unless justified.
+File uploads: validate type via magic bytes (not extension), enforce size limits, store outside the web root, generate new filenames.
+7. Data Has a Lifecycle
+Collect only what you need. Do not store data "just in case."
+Encrypt sensitive data at rest. Use TLS for all data in transit.
+Do not log PII, credentials, tokens, or session identifiers.
+Sanitize or mask sensitive fields before they reach logs, analytics, or error reporters.
+8. Concurrency Is a Security Problem
+If you check a condition and then act on it, consider what happens if the state changes between the check and the action (TOCTOU).
+Use database-level constraints and transactions for anything involving money, quotas, inventory, or permissions. Do not rely on application-level checks alone.
+Rate-limit state-changing operations. Assume attackers will send thousands of concurrent requests.
+Quick Reference: Top CWEs to Avoid
+Pattern	CWE	What You Must Do
+SQL Injection	CWE-89	Parameterized queries only. No string concatenation.
+XSS	CWE-79	Context-aware output encoding. No innerHTML with user data.
+Command Injection	CWE-78	Array-based subprocess args. Never shell=True with user input.
+Path Traversal	CWE-22	Canonicalize paths. Jail to a base directory. Reject ..
+Hardcoded Secrets	CWE-798	Environment variables or secrets manager. Zero secrets in code.
+Broken Access Control	CWE-284	Auth middleware on every route. Ownership check on every resource.
+IDOR	CWE-639	Map IDs to authenticated user. Never trust client-supplied IDs alone.
+Insecure Deserialization	CWE-502	Never deserialize untrusted data without type allowlisting.
+SSRF	CWE-918	Allowlist destination hosts. Block internal/private IP ranges.
+Open Redirect	CWE-601	Allowlist redirect targets. Never redirect to user-supplied URLs.
+When You Are Unsure
+If you are uncertain whether something is secure:
+
+Say so. "I'm not certain this pattern is safe against X — verify before deploying."
+Default to the more restrictive option.
+Recommend the user run the output through a security review.
+Do not silently produce code that you suspect may be vulnerable.
